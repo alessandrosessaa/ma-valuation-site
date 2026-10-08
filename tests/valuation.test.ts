@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {calculate,defaults,validate} from '../lib/valuation.ts';
+test('one year cash flow and zero discount rate',()=>{const v=calculate({...defaults,ev:100,debt:20,price:90,synergy:20,tax:25,probability:50,ramp:1,horizon:1,rate:0,cost:2});assert.equal(v.equity,80);assert.equal(v.gross,7.5);assert.equal(v.net,5.5);assert.equal(v.maximum,85.5);assert.equal(v.npv,-4.5)});
+test('linear ramp stops at full realization with no terminal value',()=>{const v=calculate({...defaults,synergy:30,tax:0,probability:100,ramp:3,horizon:4,rate:0,cost:0});assert.deepEqual(v.years.map(y=>y.cash),[10,20,30,30]);assert.equal(v.net,90)});
+test('zero probability retains certain integration cost',()=>assert.equal(calculate({...defaults,probability:0}).net,-defaults.cost));
+test('zero ramp, full taxes, net cash and nonpositive equity',()=>{assert.equal(calculate({...defaults,ramp:0}).years[0].realization,1);assert.equal(calculate({...defaults,tax:100}).net,-defaults.cost);assert.equal(calculate({...defaults,debt:-100}).equity,600);assert.equal(calculate({...defaults,debt:500}).premiumPercent,null);assert.equal(calculate({...defaults,debt:600}).premiumPercent,null)});
+test('break even and seller/acquirer value allocation',()=>{const v=calculate(defaults);assert.equal(calculate({...defaults,price:v.maximum}).npv,0);assert.ok(Math.abs(v.premium+v.npv-v.net)<1e-10)});
+test('discounting and horizon shorter than ramp',()=>{const v=calculate({...defaults,synergy:20,tax:0,probability:100,ramp:4,horizon:2,rate:10,cost:0});assert.ok(Math.abs(v.net-(5/1.1+10/1.1**2))<1e-10)});
+test('reject invalid and nonfinite inputs',()=>{for(const partial of [{tax:101},{probability:-1},{rate:-1},{horizon:0},{ramp:1.5},{price:-1},{ev:NaN},{cost:Infinity}])assert.ok(validate({...defaults,...partial}).length>0)});
